@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import secrets
 import logging
+import asyncio
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 
@@ -233,7 +234,8 @@ async def can_spin_wheel(user_id: int):
         if not last_spin:
             return True, 0
         
-        last_time = datetime.strptime(last_spin[0], "%Y-%m-%d %H:%M:%S.%f%z")
+        last_time = datetime.strptime(last_spin[0], "%Y-%m-%d %H:%M:%S.%f")
+        last_time = last_time.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
         diff = now - last_time
         
@@ -268,7 +270,7 @@ async def spin_wheel(user_id: int):
                 selected = prize
                 break
         
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f%z")
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
         await db.execute(
             "INSERT INTO wheel_spins (user_id, spin_date, prize) VALUES (?, ?, ?)",
             (user_id, now, selected[1])
