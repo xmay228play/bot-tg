@@ -389,27 +389,28 @@ async def lifespan(app: FastAPI):
     await init_db()
     yield
 
-api = FastAPI(lifespan=lifespan)
+# ВАЖНО: переменная ДОЛЖНА называться app для Railway
+app = FastAPI(lifespan=lifespan)
 
 
-@api.get("/")
+@app.get("/")
 async def root():
     """Health check для Railway"""
     return {"status": "ok", "app": "Массажный салон"}
 
 
 # Раздаем статику (фронтенд)
-api.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-@api.get("/api/services")
+@app.get("/api/services")
 async def get_services_api():
     """API: список услуг"""
     services = await get_services()
     return {"services": services}
 
 
-@api.post("/api/book")
+@app.post("/api/book")
 async def book_appointment(request: Request):
     """API: запись на услугу"""
     try:
@@ -443,7 +444,7 @@ async def book_appointment(request: Request):
         raise HTTPException(500, "Ошибка сервера")
 
 
-@api.post("/api/can-spin")
+@app.post("/api/can-spin")
 async def can_spin_api(request: Request):
     """API: проверить можно ли крутить колесо"""
     try:
@@ -466,7 +467,7 @@ async def can_spin_api(request: Request):
         raise HTTPException(500, "Ошибка сервера")
 
 
-@api.post("/api/spin")
+@app.post("/api/spin")
 async def spin_api(request: Request):
     """API: крутить колесо"""
     try:
@@ -496,7 +497,7 @@ async def spin_api(request: Request):
         raise HTTPException(500, "Ошибка сервера")
 
 
-@api.post("/api/user")
+@app.post("/api/user")
 async def get_user_info(request: Request):
     """API: информация о пользователе"""
     try:
@@ -676,7 +677,7 @@ async def main():
     # Запускаем FastAPI в отдельной задаче
     logger.info(f"Запуск API на порту {PORT}")
     config = uvicorn.Config(
-        api,
+        app,
         host="0.0.0.0",
         port=PORT,
         log_level="info"
