@@ -547,8 +547,9 @@ async def cmd_start(message: types.Message):
         f"👋 Привет, {message.from_user.full_name or 'друг'}!\n\n"
         f"Я бот для записи на массаж. Вот что я умею:\n\n"
         f"📅 <b>Записаться</b> — выбери услугу и удобное время\n"
-        f"🎡 <b>Колесо фортуны</b> — крути раз в день и выигрывай призы\n"
-        f"👤 <b>Мои записи</b> — посмотреть активные записи"
+        f"🎡 <b>Колесо фортуны</b> — крути раз в день и выигрывай призы (в Mini App)\n"
+        f"👤 <b>Мои записи</b> — посмотреть активные записи\n\n"
+        f"🗂 А ещё есть <b>Mini App</b> с красивым интерфейсом — нажми на кнопку внизу чата!"
     )
     
     kb = ReplyKeyboardMarkup(
@@ -562,9 +563,25 @@ async def cmd_start(message: types.Message):
     await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 
+# ============= CALLBACK-ХЕНДЛЕРЫ ЗАПИСИ =============
+
+
+async def get_available_times(db, date: str):
+    """Получить свободное время для даты (с 9:00 до 20:00, шаг 1ч)"""
+    cursor = await db.execute(
+        "SELECT time FROM appointments WHERE date = ? AND status = 'confirmed'",
+        (date,)
+    )
+    busy_times = {row[0] for row in await cursor.fetchall()}
+    
+    all_times = [f"{h:02d}:00" for h in range(9, 20)]
+    available = [t for t in all_times if t not in busy_times]
+    return available
+
+
 @dp.message(lambda m: m.text == "📅 Записаться")
 async def show_services(message: types.Message):
-    """Показать список услуг"""
+    """Шаг 1: выбрать услугу"""
     services = await get_services()
     
     if not services:
@@ -574,38 +591,191 @@ async def show_services(message: types.Message):
     builder = InlineKeyboardBuilder()
     
     for s in services:
-        btn_text = f"{s['name']} — {s['price']}₽ / {s['duration']}мин"
-        webapp_url = f"{WEBAPP_URL}/#book-{s['id']}"
         builder.row(InlineKeyboardButton(
-            text=btn_text,
-            web_app=WebAppInfo(url=webapp_url)
+            text=f"{s['name']} — {s['price']}₽ / {s['duration']}мин",
+            callback_data=f"svc_{s['id']}"
         ))
     
     await message.answer(
-        "📅 <b>Выбери услугу:</b>\n\n"
-        "После выбора ты сможешь посмотреть свободные даты и записаться.",
+        "📅 <b>Выбери услугу:</b>",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
 
 
-@dp.message(lambda m: m.text == "🎡 Колесо фортуны")
-async def show_wheel(message: types.Message):
-    """Открыть колесо фортуны в Mini App"""
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[[
-            InlineKeyboardButton(
-                text="🎡 Открыть колесо",
-                web_app=WebAppInfo(url=WEBAPP_URL + "/")
-            )
-        ]]
+@dp.callback_query(lambda c: c.data.startswith("svc_"))
+async def pick_service(callback: types.CallbackQuery):
+    """Шаг 2: выбрать дату"""
+    service_id = callback.data.split("_")[1]
+    
+    today = datetime.now(timezone.utc)
+    dates = [
+        today.strftime("%Y-%m-%d"),
+        (today + timedelta(days=1)).strftime("%Y-%m-%d"),
+        (today + timedelta(days=2)).strftime("%Y-%m-%d"),
+    ]
+    labels = ["Сегодня", "Завтра", "Послезавтра"]
+    
+    builder = InlineKeyboardBuilder()
+    for i, date in enumerate(dates):
+        builder.row(InlineKeyboardButton(
+            text=labels[i],
+            callback_data=f"dt_{service_id}_{date}"
+        ))
+    
+    await callback.message.edit_text(
+        "📅 <b>Выбери дату:</b>",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data.startswith("dt_"))
+async def pick_date(callback: types.CallbackQuery):
+    """Шаг 3: выбрать время"""
+    parts = callback.data.split("_")
+    service_id = parts[1]
+    date = parts[2]
+    
+    async with aiosqlite.connect(DB_PATH) as db:
+        times = await get_available_times(db, date)
+    
+    if not times:
+        await callback.message.edit_text(
+            "😔 На этот день нет свободного времени. Выбери другую дату.",
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        return
+    
+    builder = InlineKeyboardBuilder()
+    for t in times:
+        builder.row(InlineKeyboardButton(
+            text=t,
+            callback_data=f"tm_{service_id}_{date}_{t}"
+        ))
+    
+    # Кнопка "Назад" к услугам
+    builder.row(InlineKeyboardButton(
+        text="🔙 К услугам",
+        callback_data="back_to_services"
+    ))
+    
+    await callback.message.edit_text(
+        f"📅 <b>Выбери время на {date}:</b>",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data == "back_to_services")
+async def back_to_services(callback: types.CallbackQuery):
+    """Вернуться к выбору услуги"""
+    services = await get_services()
+    
+    builder = InlineKeyboardBuilder()
+    for s in services:
+        builder.row(InlineKeyboardButton(
+            text=f"{s['name']} — {s['price']}₽ / {s['duration']}мин",
+            callback_data=f"svc_{s['id']}"
+        ))
+    
+    await callback.message.edit_text(
+        "📅 <b>Выбери услугу:</b>",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data.startswith("tm_"))
+async def pick_time(callback: types.CallbackQuery):
+    """Шаг 4: подтверждение записи"""
+    parts = callback.data.split("_")
+    service_id = int(parts[1])
+    date = parts[2]
+    time_slot = parts[3]
+    
+    user = await get_or_create_user(
+        callback.from_user.id,
+        callback.from_user.username,
+        callback.from_user.full_name
     )
     
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT id, name, price FROM services WHERE id = ?",
+            (service_id,)
+        )
+        service = await cursor.fetchone()
+    
+    confirm_text = (
+        f"📅 <b>Подтверждение записи</b>\n\n"
+        f"<b>Услуга:</b> {service[1]}\n"
+        f"<b>Цена:</b> {service[2]}₽\n"
+        f"<b>Дата:</b> {date}\n"
+        f"<b>Время:</b> {time_slot}\n\n"
+        f"Всё верно?"
+    )
+    
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"cfrm_{service_id}_{date}_{time_slot}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="back_to_services")
+    )
+    
+    await callback.message.edit_text(
+        confirm_text,
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data.startswith("cfrm_"))
+async def confirm_booking(callback: types.CallbackQuery):
+    """Шаг 5: создаём запись"""
+    parts = callback.data.split("_")
+    service_id = int(parts[1])
+    date = parts[2]
+    time_slot = parts[3]
+    
+    user = await get_or_create_user(
+        callback.from_user.id,
+        callback.from_user.username,
+        callback.from_user.full_name
+    )
+    
+    result = await create_appointment(user["id"], service_id, date, time_slot)
+    
+    if "error" in result:
+        await callback.message.edit_text(
+            f"😔 {result['error']}",
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        return
+    
+    await callback.message.edit_text(
+        "✅ <b>Запись подтверждена!</b>\n\n"
+        f"📅 {date} в {time_slot}\n"
+        f"🙏 Ждём вас!",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+# ============= КОЛЕСО ФОРТУНЫ =============
+
+@dp.message(lambda m: m.text == "🎡 Колесо фортуны")
+async def show_wheel(message: types.Message):
+    """Колесо фортуны — только через Mini App"""
     await message.answer(
         "🎡 <b>Колесо фортуны!</b>\n\n"
-        "Крути каждый день и выигрывай скидки и подарки!\n"
-        "Каждый день — новый шанс!",
-        reply_markup=kb,
+        "Крути и выигрывай скидки и подарки! 🎉\n\n"
+        "Открой Mini App через кнопку <b>«🗂 Mini App»</b> внизу чата 👇",
         parse_mode="HTML"
     )
 
