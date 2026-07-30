@@ -395,8 +395,9 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
-    """Health check для Railway"""
-    return {"status": "ok", "app": "Массажный салон"}
+    """Редирект на Mini App"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/static/")
 
 
 # Раздаем статику (фронтенд)
