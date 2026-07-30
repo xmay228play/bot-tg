@@ -564,29 +564,19 @@ async def cmd_start(message: types.Message):
 
 @dp.message(lambda m: m.text == "📅 Записаться")
 async def show_services(message: types.Message):
-    """Показать список услуг"""
-    services = await get_services()
-    
-    if not services:
-        await message.answer("😔 Услуги временно недоступны")
-        return
-    
-    builder = InlineKeyboardBuilder()
-    
-    for s in services:
-        btn_text = f"{s['name']} — {s['price']}₽ / {s['duration']}мин"
-        # Кнопка открывает Mini App с выбранной услугой
-        # Используем hash (#) вместо query params — Telegram не блокирует hash
-        webapp_url = f"{WEBAPP_URL}/#book-{s['id']}"
-        builder.row(InlineKeyboardButton(
-            text=btn_text,
-            web_app=WebAppInfo(url=webapp_url)
-        ))
-    
+    """Открыть Mini App с записью"""
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(
+                text="📅 Открыть запись",
+                web_app=WebAppInfo(url=WEBAPP_URL + "/")
+            )
+        ]]
+    )
     await message.answer(
-        "📅 <b>Выбери услугу:</b>\n\n"
-        "После выбора ты сможешь посмотреть свободные даты и записаться.",
-        reply_markup=builder.as_markup(),
+        "📅 <b>Запись на массаж</b>\n\n"
+        "Нажми кнопку ниже, чтобы открыть Mini App и выбрать услугу.",
+        reply_markup=kb,
         parse_mode="HTML"
     )
 
@@ -594,19 +584,11 @@ async def show_services(message: types.Message):
 @dp.message(lambda m: m.text == "🎡 Колесо фортуны")
 async def show_wheel(message: types.Message):
     """Открыть колесо фортуны в Mini App"""
-    user = await get_or_create_user(
-        message.from_user.id,
-        message.from_user.username,
-        message.from_user.full_name
-    )
-    
-    webapp_url = f"{WEBAPP_URL}/#wheel"
-    
     kb = InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(
-                text="🎡 Крутить колесо!",
-                web_app=WebAppInfo(url=webapp_url)
+                text="🎡 Открыть колесо",
+                web_app=WebAppInfo(url=WEBAPP_URL + "/")
             )
         ]]
     )
