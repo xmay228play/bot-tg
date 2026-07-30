@@ -576,7 +576,8 @@ async def show_services(message: types.Message):
     for s in services:
         btn_text = f"{s['name']} — {s['price']}₽ / {s['duration']}мин"
         # Кнопка открывает Mini App с выбранной услугой
-        webapp_url = f"{WEBAPP_URL}/?action=book&service_id={s['id']}&tg_id={message.from_user.id}"
+        # Используем hash (#) вместо query params — Telegram не блокирует hash
+        webapp_url = f"{WEBAPP_URL}/#book-{s['id']}"
         builder.row(InlineKeyboardButton(
             text=btn_text,
             web_app=WebAppInfo(url=webapp_url)
@@ -599,7 +600,7 @@ async def show_wheel(message: types.Message):
         message.from_user.full_name
     )
     
-    webapp_url = f"{WEBAPP_URL}/?action=wheel&tg_id={message.from_user.id}"
+    webapp_url = f"{WEBAPP_URL}/#wheel"
     
     kb = InlineKeyboardMarkup(
         inline_keyboard=[[
