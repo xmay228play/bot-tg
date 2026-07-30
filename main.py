@@ -39,7 +39,16 @@ import uvicorn
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "ВАШ_ТОКЕН_БОТА")
 SECRET_KEY = os.getenv("SECRET_KEY", "супер_секретный_ключ_смени_меня")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://ваш-домен.ru")  # URL где будет Mini App
+# Порт для Railway (они задают PORT, по умолчанию 8000)
+PORT = int(os.getenv("PORT", "8000"))
+# URL где будет Mini App — автоопределение:
+# 1. Из переменной окружения WEBAPP_URL
+# 2. Railway даёт свой домен через RAILWAY_STATIC_URL
+# 3. Запасной вариант — локальный для тестов
+_default_url = os.getenv("RAILWAY_STATIC_URL") or f"http://localhost:{PORT}"
+WEBAPP_URL = os.getenv("WEBAPP_URL", _default_url)
+if not WEBAPP_URL.startswith("http"):
+    WEBAPP_URL = f"https://{WEBAPP_URL}"
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "0").split(",")))  # ID админов через запятую
 
 DB_PATH = "bot.db"
@@ -379,9 +388,6 @@ def get_telegram_id_from_body(body: dict) -> int | None:
 
 
 # ============= FASTAPI (Mini App Backend) =============
-
-# Порт для Railway (они задают PORT, по умолчанию 8000)
-PORT = int(os.getenv("PORT", "8000"))
 
 
 @asynccontextmanager
