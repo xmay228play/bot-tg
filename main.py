@@ -395,13 +395,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# Раздаем статику (фронтенд)
-app.mount("/static", StaticFiles(directory=os.path.join(BASEDIR, "static"), html=True), name="static")
+# Раздаем статику (статику раздаёт nginx/reverse-proxy, но для Railway так)
+app.mount("/static", StaticFiles(directory=os.path.join(BASEDIR, "static")), name="static")
 
 
 @app.get("/")
 async def root():
-    """Отдаем Mini App напрямую"""
+    """Главная страница Mini App"""
     html_path = os.path.join(BASEDIR, "static", "index.html")
     if os.path.exists(html_path):
         with open(html_path, encoding="utf-8") as f:
