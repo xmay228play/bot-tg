@@ -46,7 +46,8 @@ PORT = int(os.getenv("PORT", "8000"))
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bot-tg-production-f2f4.up.railway.app")
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "0").split(",")))  # ID админов через запятую
 
-DB_PATH = "bot.db"
+BASEDIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASEDIR, "bot.db")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -395,14 +396,13 @@ app = FastAPI(lifespan=lifespan)
 
 
 # Раздаем статику (фронтенд)
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(BASEDIR, "static"), html=True), name="static")
 
 
 @app.get("/")
 async def root():
     """Отдаем Mini App напрямую"""
-    import os
-    html_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    html_path = os.path.join(BASEDIR, "static", "index.html")
     if os.path.exists(html_path):
         with open(html_path, encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
