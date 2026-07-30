@@ -393,15 +393,19 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+# Раздаем статику (фронтенд)
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+
+
 @app.get("/")
 async def root():
-    """Редирект на Mini App"""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/static/")
-
-
-# Раздаем статику (фронтенд)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+    """Отдаем Mini App напрямую"""
+    import os
+    html_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if os.path.exists(html_path):
+        with open(html_path, encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Mini App not found</h1>")
 
 
 @app.get("/api/services")
@@ -571,7 +575,7 @@ async def show_services(message: types.Message):
     for s in services:
         btn_text = f"{s['name']} — {s['price']}₽ / {s['duration']}мин"
         # Кнопка открывает Mini App с выбранной услугой
-        webapp_url = f"{WEBAPP_URL}/static/?action=book&service_id={s['id']}&tg_id={message.from_user.id}"
+        webapp_url = f"{WEBAPP_URL}/?action=book&service_id={s['id']}&tg_id={message.from_user.id}"
         builder.row(InlineKeyboardButton(
             text=btn_text,
             web_app=WebAppInfo(url=webapp_url)
@@ -594,7 +598,7 @@ async def show_wheel(message: types.Message):
         message.from_user.full_name
     )
     
-    webapp_url = f"{WEBAPP_URL}/static/?action=wheel&tg_id={message.from_user.id}"
+    webapp_url = f"{WEBAPP_URL}/?action=wheel&tg_id={message.from_user.id}"
     
     kb = InlineKeyboardMarkup(
         inline_keyboard=[[
