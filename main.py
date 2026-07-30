@@ -41,14 +41,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "ВАШ_ТОКЕН_БОТА")
 SECRET_KEY = os.getenv("SECRET_KEY", "супер_секретный_ключ_смени_меня")
 # Порт для Railway (они задают PORT, по умолчанию 8000)
 PORT = int(os.getenv("PORT", "8000"))
-# URL где будет Mini App — автоопределение:
-# 1. Из переменной окружения WEBAPP_URL
-# 2. Railway даёт свой домен через RAILWAY_STATIC_URL
-# 3. Запасной вариант — локальный для тестов
-_default_url = os.getenv("RAILWAY_STATIC_URL") or f"http://localhost:{PORT}"
-WEBAPP_URL = os.getenv("WEBAPP_URL", _default_url)
-if not WEBAPP_URL.startswith("http"):
-    WEBAPP_URL = f"https://{WEBAPP_URL}"
+# URL Mini App — задан жёстко, чтобы работало всегда
+# Если хочешь сменить домен — поменяй здесь или задай WEBAPP_URL в .env
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bot-tg-production-f2f4.up.railway.app")
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "0").split(",")))  # ID админов через запятую
 
 DB_PATH = "bot.db"
